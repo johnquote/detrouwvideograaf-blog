@@ -1,0 +1,36 @@
+name: Genereer nieuwe stad
+
+on:
+  schedule:
+    - cron: '0 8 */2 * *'   # elke 2 dagen om 08:00 UTC
+  workflow_dispatch:          # ook handmatig te starten via GitHub
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python installeren
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Dependencies installeren
+        run: pip install -r generator/requirements.txt
+
+      - name: Git configureren
+        run: |
+          git config user.name "De Trouwvideograaf Bot"
+          git config user.email "bot@detrouwvideograaf.net"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/johnquote/detrouwvideograaf-blog.git
+
+      - name: Artikel genereren en publiceren
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          BLOG_DIR: ${{ github.workspace }}
+        run: python3 generator/main.py
