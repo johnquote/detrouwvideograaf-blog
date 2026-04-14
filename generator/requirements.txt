@@ -1,0 +1,8 @@
+# De Trouwvideograaf Blog Generator – Dependencies
+# Installeer met: pip install -r requirements.txt
+
+# Claude API (Anthropic)
+anthropic>=0.40.0
+
+# .env bestand laden
+python-dotenv>=1.0.0
