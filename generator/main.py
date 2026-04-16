@@ -249,11 +249,22 @@ def rebuild_index_html(published_list):
     index_path.write_text(index_html, encoding='utf-8')
     print(f"  Index bijgewerkt met {len(published_cities)} steden.")
 
-    # Push index.html naar GitHub
-    run_git(['add', 'index.html'], cwd=str(blog_path))
+    # Sitemap.xml bijwerken
+    today = datetime.now().strftime('%Y-%m-%d')
+    url_entries = '\n\n  <url>\n    <loc>https://blog.detrouwvideograaf.net/</loc>\n    <lastmod>' + today + '</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>1.0</priority>\n  </url>'
+    for c in published_cities:
+        url_entries += f'\n\n  <url>\n    <loc>https://blog.detrouwvideograaf.net/{c["slug"]}</loc>\n    <lastmod>{today}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.8</priority>\n  </url>'
+
+    sitemap_xml = f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{url_entries}\n\n</urlset>\n'
+    sitemap_path = blog_path / 'sitemap.xml'
+    sitemap_path.write_text(sitemap_xml, encoding='utf-8')
+    print(f"  Sitemap bijgewerkt met {len(published_cities)} steden.")
+
+    # Push index.html + sitemap.xml naar GitHub
+    run_git(['add', 'index.html', 'sitemap.xml'], cwd=str(blog_path))
     ok, status = run_git(['status', '--short'], cwd=str(blog_path))
     if status.strip():
-        run_git(['commit', '-m', f'Update blog index ({len(published_cities)} steden)'], cwd=str(blog_path))
+        run_git(['commit', '-m', f'Update blog index + sitemap ({len(published_cities)} steden)'], cwd=str(blog_path))
         run_git(['push', 'origin', 'main'], cwd=str(blog_path))
 
 
