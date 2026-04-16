@@ -34,7 +34,7 @@ from config import check_config, BLOG_DIR
 from cities import CITIES, get_city, get_next_city
 from agents import run_pipeline
 from html_template import generate_html
-from publisher import publish_article
+from publisher import publish_article, run_git
 from emailer import send_article_notification
 
 
@@ -128,6 +128,135 @@ def show_status():
     print(f"Nog te doen: {total - done} steden\n")
 
 
+def rebuild_index_html(published_list):
+    """
+    Herbouw index.html op basis van alle gepubliceerde steden.
+    Voegt automatisch nieuwe steden toe na elke publicatie.
+    """
+    blog_path = Path(BLOG_DIR)
+
+    # Haal city-data op voor elke gepubliceerde stad (in volgorde van CITIES)
+    published_cities = [c for c in CITIES if c['slug'] in published_list]
+
+    if not published_cities:
+        return
+
+    # Genereer kaartjes HTML
+    cards_html = ''
+    for c in published_cities:
+        img = c.get('wikimedia_hero', '')
+        slug = c['slug']
+        city_name = c['city']
+        province = c['province']
+        character = c.get('character', '')
+        # Korte beschrijving op basis van character
+        desc = character.capitalize() + '.' if character else f'Trouwvideografie in {city_name}.'
+
+        cards_html += f'''
+    <a href="{slug}.html" class="card">
+      <div class="card-img">
+        <img src="{img}" alt="Trouwvideograaf {city_name}" loading="lazy" />
+      </div>
+      <div class="card-body">
+        <div class="card-tag">{city_name} &middot; {province}</div>
+        <h2>Trouwvideograaf {city_name} – Professionele Trouwfilm</h2>
+        <p>{desc}</p>
+        <span class="card-link">Lees verder &rarr;</span>
+      </div>
+    </a>
+'''
+
+    index_html = f'''<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog | De Trouwvideograaf – Trouwfilms door heel Nederland</title>
+  <meta name="description" content="Lees alles over trouwvideografie per stad. Tips, locaties en inspiratie van De Trouwvideograaf voor jouw bruiloft." />
+  <link rel="canonical" href="https://blog.detrouwvideograaf.net" />
+  <link rel="icon" href="https://horizons-cdn.hostinger.com/7cd8ba0d-3977-441d-bf44-807d3f62ddbd/246cf8ed4e7e7c18381b5834fe2100e9.png" />
+  <style>
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    body {{ font-family: 'Georgia', serif; color: #1a1a1a; background: #fff; line-height: 1.8; }}
+    nav {{ background: #fff; border-bottom: 1px solid #eee; padding: 14px 40px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }}
+    nav .logo {{ display: flex; align-items: center; text-decoration: none; }}
+    nav .logo img {{ height: 52px; width: auto; display: block; }}
+    nav a.cta {{ background: #c9a84c; color: white; padding: 10px 22px; border-radius: 30px; text-decoration: none; font-size: 0.9rem; font-family: sans-serif; font-weight: bold; }}
+    nav a.cta:hover {{ background: #b8943e; }}
+    .page-hero {{ background: #1a1a1a; color: white; padding: 80px 40px 60px; text-align: center; }}
+    .page-hero .tag {{ font-family: sans-serif; font-size: 0.75rem; letter-spacing: 3px; text-transform: uppercase; color: #c9a84c; margin-bottom: 16px; }}
+    .page-hero h1 {{ font-size: 2.8rem; margin-bottom: 16px; }}
+    .page-hero p {{ font-size: 1.1rem; color: rgba(255,255,255,0.75); max-width: 600px; margin: 0 auto; font-family: sans-serif; }}
+    .posts {{ max-width: 1100px; margin: 0 auto; padding: 60px 32px 80px; }}
+    .posts-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }}
+    .card {{ border-radius: 16px; overflow: hidden; border: 1px solid #eee; background: #fff; text-decoration: none; color: #1a1a1a; display: block; transition: box-shadow 0.2s, transform 0.2s; }}
+    .card:hover {{ box-shadow: 0 8px 32px rgba(0,0,0,0.10); transform: translateY(-3px); }}
+    .card-img {{ height: 200px; overflow: hidden; }}
+    .card-img img {{ width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s; }}
+    .card:hover .card-img img {{ transform: scale(1.05); }}
+    .card-body {{ padding: 22px 24px 28px; }}
+    .card-tag {{ font-family: sans-serif; font-size: 0.72rem; letter-spacing: 2px; text-transform: uppercase; color: #c9a84c; margin-bottom: 8px; }}
+    .card-body h2 {{ font-size: 1.15rem; line-height: 1.4; margin-bottom: 10px; color: #1a1a1a; }}
+    .card-body p {{ font-size: 0.92rem; color: #666; font-family: sans-serif; line-height: 1.6; margin-bottom: 16px; }}
+    .card-link {{ font-family: sans-serif; font-size: 0.85rem; font-weight: bold; color: #c9a84c; }}
+    footer {{ background: #1a1a1a; color: #999; text-align: center; padding: 48px 32px 32px; font-family: sans-serif; font-size: 0.85rem; }}
+    .footer-logo {{ height: 64px; width: auto; display: block; margin: 0 auto 24px; opacity: 0.9; }}
+    footer a {{ color: #c9a84c; text-decoration: none; }}
+    @media (max-width: 900px) {{ .posts-grid {{ grid-template-columns: repeat(2, 1fr); }} }}
+    @media (max-width: 580px) {{
+      .posts-grid {{ grid-template-columns: 1fr; }}
+      .page-hero h1 {{ font-size: 2rem; }}
+      nav {{ padding: 10px 20px; }}
+      nav .logo img {{ height: 40px; }}
+      .posts {{ padding: 40px 20px 60px; }}
+    }}
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="https://www.detrouwvideograaf.net" class="logo">
+    <img src="https://horizons-cdn.hostinger.com/7cd8ba0d-3977-441d-bf44-807d3f62ddbd/82feefc4ccc72bbcb44edf66a1b1ba2b.png"
+         alt="De Trouwvideograaf" />
+  </a>
+  <a href="https://www.detrouwvideograaf.net/#contact" class="cta">Gratis offerte</a>
+</nav>
+
+<div class="page-hero">
+  <div class="tag">Trouwvideografie &middot; Per stad</div>
+  <h1>Blog</h1>
+  <p>Alles over trouwen op bijzondere locaties door heel Nederland — en hoe wij jouw dag vastleggen.</p>
+</div>
+
+<main class="posts">
+  <div class="posts-grid">
+{cards_html}
+  </div>
+</main>
+
+<footer>
+  <a href="https://www.detrouwvideograaf.net">
+    <img src="https://horizons-cdn.hostinger.com/7cd8ba0d-3977-441d-bf44-807d3f62ddbd/246cf8ed4e7e7c18381b5834fe2100e9.png"
+         alt="De Trouwvideograaf" class="footer-logo" />
+  </a>
+  <p>&copy; 2026 <a href="https://www.detrouwvideograaf.net">De Trouwvideograaf</a> &middot; Professionele trouwvideografie door heel Nederland &middot; <a href="https://www.detrouwvideograaf.net/#contact">Contact</a></p>
+</footer>
+
+</body>
+</html>'''
+
+    index_path = blog_path / 'index.html'
+    index_path.write_text(index_html, encoding='utf-8')
+    print(f"  Index bijgewerkt met {len(published_cities)} steden.")
+
+    # Push index.html naar GitHub
+    run_git(['add', 'index.html'], cwd=str(blog_path))
+    ok, status = run_git(['status', '--short'], cwd=str(blog_path))
+    if status.strip():
+        run_git(['commit', '-m', f'Update blog index ({len(published_cities)} steden)'], cwd=str(blog_path))
+        run_git(['push', 'origin', 'main'], cwd=str(blog_path))
+
+
 def generate_for_city(city, test_mode=False):
     """
     Genereer en publiceer een artikel voor een specifieke stad.
@@ -167,12 +296,15 @@ def generate_for_city(city, test_mode=False):
         else:
             published = publish_article(html, filename, city['city'])
 
-        # ─── GEPUBLICEERD BIJHOUDEN ────────────────────────────────────
+        # ─── GEPUBLICEERD BIJHOUDEN + INDEX UPDATEN ───────────────────
         if not test_mode:
             published_list = load_published()
             if city['slug'] not in published_list:
                 published_list.append(city['slug'])
                 save_published(published_list)
+            # Herbouw index.html zodat nieuwe stad zichtbaar is
+            print("\n  Blog index updaten...")
+            rebuild_index_html(published_list)
 
         # ─── EMAIL NOTIFICATIE ─────────────────────────────────────────
         send_article_notification(city, meta, html, published if not test_mode else False)
